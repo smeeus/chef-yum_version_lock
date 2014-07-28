@@ -82,7 +82,7 @@ action :unlock do
 end
 
 action :track do
-  package_installed = `rpm -qa | grep #{new_resource.name}`
+  package_installed = `rpm -qa | grep #{new_resource.source || new_resource.name}`
   package_installed.empty? ? action_unlock : action_lock
 end
 
