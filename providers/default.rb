@@ -16,73 +16,109 @@ def version_file
   node[:yum][:versionlock][:file]
 end
 
-def hash_from_spec s
-  if match = s.match(/^(\d+):(.+)-(.+)-(.+).(.+)$/)
-    epoch, name, version, release, arch = match.captures
+#
+# To-From
+#
+
+  def hash_from_spec s
+    if match = s.match(/^(\d+):(.+)-(.+)-(.+).(.+)$/)
+      epoch, name, version, release, arch = match.captures
+      { 
+        :name => name,
+        :epoch => epoch,
+        :version => version, 
+        :release => release, 
+        :arch => arch 
+      }
+    end
+  end
+
+  def hash_from_resource
+    name = new_resource.name
+    version, release = new_resource.version.split('-')
     { 
       :name => name,
-      :epoch => epoch,
-      :version => version, 
-      :release => release, 
-      :arch => arch 
-    }
+      :version => version,
+      :release => release
+    }.reject { |k,v| v.nil? }
   end
-end
 
-def hash_from_resource
-  { 
-    :name => new_resource.source || new_resource.name,
-    :version => new_resource.version,
-    :release => new_resource.release
-  }.reject { |k,v| v.nil? }
-end
+  def spec_from_hash h
+    s = ""
+    s << "#{h[:epoch]}:" if h[:epoch]
+    s << "#{h[:name]}-#{h[:version]}-#{h[:release] || 1}"
+    s << ".#{h[:arch] || "*" }"
+    s
+  end
 
-def spec_from_hash h
-  "#{h[:epoch]}:#{h[:name]}-#{h[:version]}-#{h[:release]}.#{h[:arch]}"
-end
 
-def version_locks
-  @version_locks = [] unless ::File.exist? version_file
-  @version_locks ||= begin
-    parsed_data = []                   
-    open(version_file) do |io|
-      io.each_line do |line|
-        next if line =~ /^\s*(#.*)?$/
-        next unless hash = hash_from_spec(line)
-        parsed_data << hash
+#
+# Lock listing
+#
+
+  def version_locks
+    @version_locks = [] unless ::File.exist? version_file
+    @version_locks ||= begin
+      parsed_data = []                   
+      open(version_file) do |io|
+        io.each_line do |line|
+          next if line =~ /^\s*(#.*)?$/
+          next unless hash = hash_from_spec(line)
+          parsed_data << hash
+        end
       end
+      parsed_data
     end
-    parsed_data
   end
-end
 
-def version_locks_for_hash opts={}
-  version_locks.select do |data|
-    opts.all? { |k,v| data[k] == v }
+  def version_locks_for_hash opts={}
+    version_locks.select do |data|
+      opts.all? { |k,v| data[k] == v }
+    end
   end
-end
 
-def version_locks_for_resource
-  version_locks_for_hash hash_from_resource
-end
+  def version_locks_for_resource
+    version_locks_for_hash hash_from_resource
+  end
+
+  def version_locks_outstanding
+    resource_hash = hash_from_resource
+    resource_hash.delete :version
+    resource_hash.delete :release
+
+    version_locks_for_hash(resource_hash).select do |hash|
+      next if hash[:version] == new_resource.version
+
+      if hash[:version] == new_resource.version
+        if new_resource.release and hash[:release]
+          next if hash[:release] == new_resource.release
+        end
+      end
+      
+      true
+    end
+  end
 
 action :lock do
-  execute "yum versionlock add #{new_resource.source || new_resource.name}" do
+  # Unlock outstanding version locks
+  version_locks_outstanding.uniq.each do |hash|
+    execute "yum versionlock delete #{spec_from_hash hash}" do
+      action :nothing
+    end.run_action :run
+  end
+  # Lock current version if not locked
+  execute "yum versionlock add #{spec_from_hash hash_from_resource}" do
     only_if { version_locks_for_resource.empty? }
     action :nothing
   end.run_action :run
 end
 
 action :unlock do
+  # Remove locks matching attributes supplied
   version_locks_for_resource.uniq.each do |hash|
     execute "yum versionlock delete #{spec_from_hash hash}" do
       action :nothing
     end.run_action :run
   end
-end
-
-action :track do
-  package_installed = `rpm -qa | grep #{new_resource.source || new_resource.name}`
-  package_installed.empty? ? action_unlock : action_lock
 end
 
