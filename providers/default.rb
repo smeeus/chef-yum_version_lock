@@ -105,12 +105,15 @@ action :lock do
     execute "yum versionlock delete #{spec_from_hash hash}" do
       action :nothing
     end.run_action :run
+    new_resource.updated_by_last_action true
   end
   # Lock current version if not locked
-  execute "yum versionlock add #{spec_from_hash hash_from_resource}" do
-    only_if { version_locks_for_resource.empty? }
-    action :nothing
-  end.run_action :run
+  if version_locks_for_resource.empty?
+    execute "yum versionlock add #{spec_from_hash hash_from_resource}" do
+      action :nothing
+    end.run_action :run
+    new_resource.updated_by_last_action true
+  end
 end
 
 action :unlock do
@@ -119,6 +122,7 @@ action :unlock do
     execute "yum versionlock delete #{spec_from_hash hash}" do
       action :nothing
     end.run_action :run
+    new_resource.updated_by_last_action true
   end
 end
 
