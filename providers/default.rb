@@ -35,7 +35,12 @@ end
 
   def hash_from_resource
     name = new_resource.name
-    version, release = new_resource.version.split('-')
+    if new_resource.release.nil?
+      version, release = new_resource.version.split('-')
+    else
+      version = new_resource.version
+      release = new_resource.release
+    end
     { 
       :name => name,
       :version => version,
