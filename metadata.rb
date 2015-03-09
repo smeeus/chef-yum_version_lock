@@ -4,5 +4,5 @@ maintainer_email 'jonathan@lightspeedretail.com'
 license          'All rights reserved'
 description      'Installs/Configures yum_version_lock'
 long_description 'Installs/Configures yum_version_lock'
-version          '0.1.1'
+version          '0.1.2'
 
