@@ -19,6 +19,9 @@ def load_current_resource
   if new_resource.arch.nil?
     new_resource.arch '*'
   end
+  if new_resource.even_if_not_available.nil?
+    new_resource.even_if_not_available false
+  end
 end
 
 def version_file
@@ -175,10 +178,12 @@ action :lock do
       action :nothing
       only_if "yum list #{new_resource.name} | grep #{new_resource.name}"
     end.run_action :run
-    execute "echo \"#{spec_from_hash hash_from_resource}\" >> #{version_file}" do
-      action :nothing
-      not_if "yum list #{new_resource.name} | grep #{new_resource.name}"
-    end.run_action :run
+    if new_resource.even_if_not_available
+      execute "echo \"#{spec_from_hash hash_from_resource}\" >> #{version_file}" do
+        action :nothing
+        not_if "yum list #{new_resource.name} | grep #{new_resource.name}"
+      end.run_action :run
+    end
     new_resource.updated_by_last_action true
   end
 end
