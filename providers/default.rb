@@ -2,25 +2,12 @@
 use_inline_resources
 
 def load_current_resource
-  if new_resource.epoch.nil?
-    new_resource.epoch '0'
-  end
   if new_resource.release.nil?
-    version, release = new_resource.version.split('-')
-
-    unless release.nil?
-      new_resource.version version
-      new_resource.release release
-    else
-      new_resource.version version
-      new_resource.release '*'
+    unless new_resource.version.nil?
+      version, release = new_resource.version.split('-')
     end
-  end
-  if new_resource.arch.nil?
-    new_resource.arch '*'
-  end
-  if new_resource.even_if_not_available.nil?
-    new_resource.even_if_not_available false
+    new_resource.version version
+    new_resource.release release
   end
 end
 
@@ -47,30 +34,16 @@ end
 
 def hash_from_resource
   name = new_resource.name
-  if new_resource.epoch.nil?
-    epoch = '0'
-  else
-    epoch = new_resource.epoch
-  end
+  epoch = new_resource.epoch
   if new_resource.release.nil?
-    version, release = new_resource.version.split('-')
-
-    unless release.nil?
-      new_resource.version version
-      new_resource.release release
-    else
-      new_resource.version version
-      new_resource.release '*'
+    unless new_resource.version.nil?
+      version, release = new_resource.version.split('-')
     end
   else
     version = new_resource.version
     release = new_resource.release
   end
-  if new_resource.arch.nil?
-    arch = '*'
-  else
-    arch = new_resource.arch
-  end
+  arch = new_resource.arch
   { 
     :name => name,
     :epoch => epoch,
@@ -165,6 +138,16 @@ end
 
 
 action :lock do
+  # set resource defaults if they have not been set
+  # failing to do so will result in removal and adding the same lock
+  if new_resource.epoch.nil? then new_resource.epoch '0' end
+  if new_resource.version.nil? then new_resource.version '*' end
+  if new_resource.release.nil?
+    version, release = new_resource.version.split('-')
+    unless release.nil? then new_resource.release release else new_resource.release '*' end
+  end
+  if new_resource.arch.nil? then new_resource.arch '*' end
+
   # Unlock outstanding version locks
   version_locks_outstanding.uniq.each do |hash|
     execute "yum versionlock delete #{spec_from_hash hash}" do
