@@ -1,5 +1,5 @@
 
-actions :lock, :unlock, :track
+actions :lock, :unlock
 default_action :lock
 
 attribute :epoch, :kind_of => String
